@@ -20,24 +20,11 @@
 // binaries never enter the scan.
 import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import {
-  compileTriggers,
-  scanText,
-  type CompiledTrigger,
-} from "./src/triggers";
-import {
-  hasStallPhrasing,
-  hasAutonomyDirective,
-  narratorLabel,
-} from "./src/detectors";
+import { compileTriggers, scanText, type CompiledTrigger } from "./src/triggers";
+import { hasStallPhrasing, hasAutonomyDirective } from "./src/detectors";
 
 const HOME = process.env.HOME ?? "/home/hatch";
-const SYSTEM_JOB_HINTS = [
-  "feed-pulse-",
-  "deterministic-doctor",
-  "profile-image",
-  "heartbeat",
-];
+const SYSTEM_JOB_HINTS = ["feed-pulse-", "deterministic-doctor", "profile-image", "heartbeat"];
 
 const COMPILED: CompiledTrigger[] = compileTriggers();
 
@@ -54,7 +41,6 @@ interface Finding {
   isSystem: boolean;
   hasDirective: boolean;
   hasStall: boolean;
-  narrator: string;
   instructionHits: Hit[];
   exampleHits: Hit[];
 }
@@ -73,16 +59,7 @@ function* walk(dir: string): Generator<string> {
     if (entry.isDirectory()) {
       // Skip archives, one-shot probes, run logs, and user-facing files —
       // the sweep audits ACTIVE task definitions and goal guides only.
-      if (
-        [
-          "_archive",
-          "runonce",
-          "hidden_files",
-          "files",
-          "agent_notes",
-        ].includes(entry.name)
-      )
-        continue;
+      if (["_archive", "runonce", "hidden_files", "files", "agent_notes"].includes(entry.name)) continue;
       yield* walk(p);
     } else if (entry.isFile() && entry.name.endsWith(".md")) yield p;
   }
@@ -119,7 +96,6 @@ function scanFile(file: string): Finding {
     isSystem,
     hasDirective: hasAutonomyDirective(text),
     hasStall: hasStallPhrasing(text),
-    narrator: narratorLabel(text),
     instructionHits,
     exampleHits,
   };
@@ -132,10 +108,7 @@ async function preflight(args: string[]): Promise<number> {
   if (args.includes("--stdin")) {
     const chunks: Buffer[] = [];
     for await (const c of Bun.stdin.stream()) chunks.push(Buffer.from(c));
-    inputs.push({
-      name: "<stdin>",
-      text: Buffer.concat(chunks).toString("utf8"),
-    });
+    inputs.push({ name: "<stdin>", text: Buffer.concat(chunks).toString("utf8") });
   } else {
     for (const f of args.filter((a) => !a.startsWith("--"))) {
       if (!existsSync(f)) {
@@ -157,13 +130,7 @@ async function preflight(args: string[]): Promise<number> {
     total += hits.length;
   }
   if (asJson) {
-    console.log(
-      JSON.stringify(
-        { scanned: inputs.length, findings: total, report },
-        null,
-        1,
-      ),
-    );
+    console.log(JSON.stringify({ scanned: inputs.length, findings: total, report }, null, 1));
   } else {
     for (const [name, hits] of Object.entries(report)) {
       console.log(`== ${name}: ${hits.length} trigger(s)`);
@@ -173,11 +140,7 @@ async function preflight(args: string[]): Promise<number> {
         console.log(`    fix: ${h.rewrite}`);
       }
     }
-    console.log(
-      total === 0
-        ? "clean"
-        : `${total} trigger shape(s) found — reword per fixes above`,
-    );
+    console.log(total === 0 ? "clean" : `${total} trigger shape(s) found — reword per fixes above`);
   }
   return total === 0 ? 0 : 1;
 }
@@ -200,9 +163,7 @@ function sweep(asJson: boolean): number {
   });
   // Goal-owned live task mirrors live under goals/<slug>/crons/ — include them.
   try {
-    for (const g of readdirSync(join(HOME, "workspace", "goals"), {
-      withFileTypes: true,
-    })) {
+    for (const g of readdirSync(join(HOME, "workspace", "goals"), { withFileTypes: true })) {
       if (!g.isDirectory()) continue;
       const gd = join(HOME, "workspace", "goals", g.name, "crons");
       try {
@@ -222,8 +183,7 @@ function sweep(asJson: boolean): number {
   const skillDir = join(HOME, "workspace", "skills");
   const skillDocs: string[] = [];
   try {
-    for (const f of walk(skillDir))
-      if (f.endsWith("SKILL.md")) skillDocs.push(f);
+    for (const f of walk(skillDir)) if (f.endsWith("SKILL.md")) skillDocs.push(f);
   } catch {
     /* skills dir absent */
   }
@@ -231,25 +191,19 @@ function sweep(asJson: boolean): number {
   const taskFindings = taskFiles.map(scanFile);
   const skillFindings = skillDocs.map(scanFile);
 
-  const nonSystemTasks = taskFindings.filter(
-    (f) => !f.isSystem && !isGoalGuide(f.file),
-  );
-  const missingDirective = nonSystemTasks
-    .filter((f) => !f.hasDirective)
-    .map((f) => f.file);
+  const nonSystemTasks = taskFindings.filter((f) => !f.isSystem && !isGoalGuide(f.file));
+  const missingDirective = nonSystemTasks.filter((f) => !f.hasDirective).map((f) => f.file);
   const stallBodies = nonSystemTasks
     .filter((f) => f.hasStall)
     .map((f) => f.file);
   const taskHits = taskFindings.filter(
-    (f) => !isGoalGuide(f.file) && f.instructionHits.length > 0,
+    (f) => !isGoalGuide(f.file) && f.instructionHits.length > 0
   );
   const goalGuideHits = taskFindings.filter(
-    (f) =>
-      isGoalGuide(f.file) &&
-      (f.instructionHits.length > 0 || f.exampleHits.length > 0),
+    (f) => isGoalGuide(f.file) && (f.instructionHits.length > 0 || f.exampleHits.length > 0)
   );
   const skillHits = skillFindings.filter(
-    (f) => f.instructionHits.length > 0 || f.exampleHits.length > 0,
+    (f) => f.instructionHits.length > 0 || f.exampleHits.length > 0
   );
 
   const report = {
@@ -259,10 +213,7 @@ function sweep(asJson: boolean): number {
     nonSystemTaskCount: nonSystemTasks.length,
     missingDirective,
     stallBodies,
-    taskTriggerHits: taskHits.map((f) => ({
-      file: f.file,
-      hits: f.instructionHits,
-    })),
+    taskTriggerHits: taskHits.map((f) => ({ file: f.file, hits: f.instructionHits })),
     exampleContextHits: [
       ...taskFindings
         .filter((f) => f.exampleHits.length > 0)
@@ -291,41 +242,28 @@ function sweep(asJson: boolean): number {
   } else {
     console.log(`classifier-sweep ${report.scannedAt}`);
     console.log(
-      `task bodies: ${report.taskFiles} (${report.nonSystemTaskCount} non-system), skill docs: ${report.skillDocs}`,
+      `task bodies: ${report.taskFiles} (${report.nonSystemTaskCount} non-system), skill docs: ${report.skillDocs}`
     );
     console.log(`missing directive: ${missingDirective.length}`);
     for (const f of missingDirective) console.log(`  MISSING-DIRECTIVE  ${f}`);
     console.log(`stall phrasing in task bodies: ${stallBodies.length}`);
     for (const f of stallBodies) console.log(`  STALL  ${f}`);
-    console.log(
-      `task trigger hits (instruction context): ${report.taskTriggerHits.length}`,
-    );
+    console.log(`task trigger hits (instruction context): ${report.taskTriggerHits.length}`);
     for (const t of report.taskTriggerHits)
-      for (const h of t.hits)
-        console.log(`  ${h.shape} L${h.line} ${t.file}: ${h.excerpt}`);
-    console.log(
-      `goal-guide trigger hits: ${report.goalGuideTriggerHits.length}`,
-    );
+      for (const h of t.hits) console.log(`  ${h.shape} L${h.line} ${t.file}: ${h.excerpt}`);
+    console.log(`goal-guide trigger hits: ${report.goalGuideTriggerHits.length}`);
     for (const g of report.goalGuideTriggerHits) {
       for (const h of g.instructionHits)
         console.log(`  ${h.shape} L${h.line} ${g.file}: ${h.excerpt}`);
       for (const h of g.exampleHits)
-        console.log(
-          `  [example] ${h.shape} L${h.line} ${g.file}: ${h.excerpt}`,
-        );
+        console.log(`  [example] ${h.shape} L${h.line} ${g.file}: ${h.excerpt}`);
     }
-    console.log(
-      `skill trigger hits (instruction context): ${report.skillTriggerHits.length}`,
-    );
+    console.log(`skill trigger hits (instruction context): ${report.skillTriggerHits.length}`);
     for (const s of report.skillTriggerHits)
-      for (const h of s.hits)
-        console.log(`  ${h.shape} L${h.line} ${s.file}: ${h.excerpt}`);
-    console.log(
-      `example-context hits (documented, informational): ${report.exampleContextHits.length}`,
-    );
+      for (const h of s.hits) console.log(`  ${h.shape} L${h.line} ${s.file}: ${h.excerpt}`);
+    console.log(`example-context hits (documented, informational): ${report.exampleContextHits.length}`);
     for (const e of report.exampleContextHits)
-      for (const h of e.hits)
-        console.log(`  [example] ${h.shape} L${h.line} ${e.file}`);
+      for (const h of e.hits) console.log(`  [example] ${h.shape} L${h.line} ${e.file}`);
     console.log(report.clean ? "CLEAN" : "FINDINGS-PRESENT");
   }
   return report.clean ? 0 : 2;

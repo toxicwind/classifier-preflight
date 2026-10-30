@@ -1,0 +1,23 @@
+{
+  "product": "classifier-preflight",
+  "path": "/home/toxic/pens/ranch/products/classifier-preflight",
+  "files": 17,
+  "detected_at": "2026-10-30T06:11:06.072066Z",
+  "env_vars": {
+    "CANNED_REFUSAL": [
+      "tests/regressions.test.ts"
+    ],
+    "HOME": [
+      "classifier-sweep.ts",
+      "launch-audit.ts"
+    ],
+    "name": [
+      "classifier-sweep.ts",
+      "preflight.ts"
+    ],
+    "total": [
+      "classifier-sweep.ts",
+      "preflight.ts"
+    ]
+  }
+}
